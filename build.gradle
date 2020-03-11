@@ -28,6 +28,7 @@ dependencies {
         exclude group: "org.slf4j", module: "slf4j-api"
         exclude group: "org.apache.commons", module: "commons-lang3"
     }
+    compile "org.embulk:embulk-util-timestamp:0.1.1"
 
     testCompile "junit:junit:4.13"
     testCompile "org.embulk:embulk-core:0.9.23"

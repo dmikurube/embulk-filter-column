@@ -1,7 +1,5 @@
 package org.embulk.filter.column;
 
-import com.google.common.base.Throwables;
-
 import io.github.medjed.jsonpathcompiler.expressions.Utils;
 
 import org.embulk.filter.column.ColumnFilterPlugin.ColumnConfig;
@@ -9,14 +7,13 @@ import org.embulk.filter.column.ColumnFilterPlugin.PluginTask;
 
 import org.embulk.spi.Column;
 import org.embulk.spi.ColumnVisitor;
+import org.embulk.spi.DataException;
 import org.embulk.spi.PageBuilder;
 import org.embulk.spi.PageReader;
 import org.embulk.spi.Schema;
 import org.embulk.spi.SchemaConfigException;
 import org.embulk.spi.json.JsonParser;
 import org.embulk.spi.time.Timestamp;
-import org.embulk.spi.time.TimestampParseException;
-import org.embulk.spi.time.TimestampParser;
 import org.embulk.spi.type.BooleanType;
 import org.embulk.spi.type.DoubleType;
 import org.embulk.spi.type.JsonType;
@@ -24,6 +21,7 @@ import org.embulk.spi.type.LongType;
 import org.embulk.spi.type.StringType;
 import org.embulk.spi.type.TimestampType;
 import org.embulk.spi.type.Type;
+import org.embulk.util.timestamp.TimestampFormatter;
 
 import org.msgpack.value.Value;
 import org.slf4j.Logger;
@@ -31,6 +29,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.List;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 
 public class ColumnVisitorImpl implements ColumnVisitor
 {
@@ -148,13 +148,18 @@ public class ColumnVisitorImpl implements ColumnVisitor
         else if (type instanceof TimestampType) {
             if (columnConfig.getDefault().isPresent()) {
                 String time = (String) columnConfig.getDefault().get();
-                TimestampParser parser = new TimestampParser(task, columnConfig);
+                final TimestampFormatter formatter = TimestampFormatter
+                        .builder(columnConfig.getFormat().or(task.getDefaultTimestampFormat()), true)
+                        .setDefaultZoneFromString(columnConfig.getTimeZoneId().or(task.getDefaultTimeZoneId()))
+                        .setDefaultDateFromString(columnConfig.getDate().or(task.getDefaultDate()))
+                        .build();
                 try {
-                    Timestamp defaultValue = parser.parse(time);
+                    Instant defaultInstant = formatter.parse(time);
+                    Timestamp defaultValue = Timestamp.ofInstant(defaultInstant);
                     return defaultValue;
                 }
-                catch (TimestampParseException ex) {
-                    throw Throwables.propagate(ex);
+                catch (final DateTimeParseException ex) {
+                    throw new DataException(ex);
                 }
             }
         }
